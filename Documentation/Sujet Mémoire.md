@@ -1,8 +1,8 @@
 # Introduction
 
-Comment les résultats de BERT obtiennent de meilleurs résultats qu'un simple 
+Comment BERT obtient de meilleures performances qu'un simple 
 algorithme "bag of words" comme TF-IDF, comment améliorer ces résultats en 
-suivant des techniques de réduction de dimensions et quels options pourraient 
+suivant des techniques de réduction de dimensions et quells options pourraient 
 améliorer nos résultats par rapport à BERT.
 
 # Documentation
@@ -45,7 +45,7 @@ exemple pour les documents suivants :
 
 La partie IDF mesure l'importance d'un terme à travers l'ensemble du corpus.
 Un terme présent dans tous les documents est peu informatif (ex: "le"), 
-tandis qu'un terme rare est plus discriminant. Elle fonctionne de cette manière :
+tandis qu'un terme rare est plus discriminant. Elle se calcule de la manière suivante :
 
 $$IDF(t) = \log\left(\frac{\text{nombre total de documents}}{\text{nombre de documents contenant } t}\right)$$
 
@@ -101,6 +101,13 @@ BERT (Bidirectional Encoder Representations from Transformers) est un modèle de
 traitement du texte basé sur l'architecture Transformer. Contrairement aux modèles 
 "Bag of Words" comme TF-IDF, BERT prend en compte le contexte et l'ordre des mots 
 pour produire des représentations vectorielles riches et contextualisées.
+
+Pour expliquer en une phrase BERT : 
+
+BERT analyse chaque mot en tenant compte de tous les autres mots de la phrase, 
+puis convertit le résultat en une liste de nombres (un vecteur) qui encode à la 
+fois le sens du mot et son contexte — c'est l'ensemble de ces vecteurs qui constitue 
+la base vectorielle.
 
 ### Tokenisation
 
@@ -363,19 +370,6 @@ Par exemple, sur les embeddings BERT-Base (768 dimensions) :
 | 256             | ~95%               |
 | 768             | 100%               |
 
-#### Implémentation avec scikit-learn
-
-```python
-from sklearn.decomposition import PCA
-
-# Conserver 95% de la variance
-pca = PCA(n_components=0.95)
-X_réduit = pca.fit_transform(embeddings)  # embeddings : (n_docs, 768) → (n_docs, k)
-
-print(f"Dimensions réduites : {X_réduit.shape[1]}")  # ex: 256
-print(f"Variance conservée : {pca.explained_variance_ratio_.sum():.2%}")
-```
-
 #### Limites
 
 PCA est une transformation **linéaire** : elle ne peut capturer que des relations 
@@ -424,21 +418,6 @@ $$\mathcal{L} = \sum_{(i,j)} \left[ w_{ij} \log\frac{w_{ij}}{\tilde{w}_{ij}} + (
 | `min_dist`       | Compacité des clusters dans l'espace réduit       | 0.1            |
 | `metric`         | Mesure de distance utilisée                       | `cosine`       |
 
-#### Implémentation
-
-```python
-import umap
-
-reducer = umap.UMAP(
-    n_components=2,      # projection pour visualisation
-    n_neighbors=15,      # voisinage local
-    min_dist=0.1,        # compacité des clusters
-    metric='cosine'      # adapté aux embeddings
-)
-
-X_réduit = reducer.fit_transform(embeddings)  # (n_docs, 768) → (n_docs, 2)
-```
-
 #### Limites
 
 UMAP est **non-déterministe** : deux exécutions sur les mêmes données peuvent 
@@ -446,6 +425,11 @@ produire des projections différentes. De plus, les distances absolues entre
 clusters dans l'espace réduit ne sont pas directement interprétables — seules 
 les relations de voisinage sont fiables.
 
+#### Graphique Umap 
+
+Le graphique Umap permet de visualiser les grandes thématiques des embeddings
+
+![images/20Newsgroup/umap_embeddings.png](images/20Newsgroup/umap_embeddings.png)
 ---
 
 ### Comparaison PCA vs UMAP
@@ -463,6 +447,71 @@ les relations de voisinage sont fiables.
 
 # Demonstration
 
+Pour commencer on fait un test simple pour comparer TF-IDF et BERT :
+
+| Modèle | Score F1    | Temps d'exécution |
+|--------|-------------|--------------|
+| TF-IDF | 0.7982      | 2.70 sec     |
+| BERT   | 0.8136      | 427.20 sec   |
+
+Avec ces résultats on observe deux choses :
+ - Le Score F1 est meilleur avec BERT
+ - Le temps d'exécution est 158 fois plus long
+
+Le modèle BERT utilisé ici étant le modele de base il se retrouve donc avec 768 dimensions mais 
+l'avantage de BERT vient après son execution car il crée une base vectorielle réutilisable 
+qui prend en compte le sens des mots.
+
+### Utilisation de PCA
+Après avoir crée notre base vectorielle avec BERT on peut appliquer la methode PCA jusqu'à 64 
+dimensions 
+
+| Modèle | Score F1    | Temps d'exécution |
+|--------|-------------|--------------|
+| BERT + PCA   |  0.8126  | 0.55 sec |
+
+Pour expliquer ce résultat, PCA a aplati les 768 dimensions de BERT jusqu'à 64 dimensions 
+ce qui a eu pour effet de perdre des données en échange de pouvoir naviguer plus rapidement 
+sur les données.
+
+### Utilisation d'UMAP
+Par la suite on a effectué des tests pour UMAP, on a aussi intégré le sous-modele 
+Arctic, un sous model adapté à l'utilisation avec Matryoshka (MiniLM étant un modèle BERT distillé).
+
+Les résultats classés selon Score F1
+
+| Famille  | Méthode                 | Score F1 | Temps Réduction (s) | Dimension | Score F1 / Dimension |
+|----------|-------------------------|----------|---------------------|-----------|----------------------|
+| Arctic   | Pleine Dim (384 et 768) | 0.748704 | 0.000000            | 768       | 0.000975             |
+| Arctic   | PCA (64)                | 0.733080 | 0.076523            | 64        | 0.011454             |
+| MiniLM   | Pleine Dim (384 et 768) | 0.704850 | 0.000000            | 384       | 0.001836             |
+| MiniLM   | PCA (64)                | 0.683000 | 0.032008            | 64        | 0.010672             |
+| Arctic   | UMAP (64)               | 0.659515 | 26.212821           | 64        | 0.010305             |
+| MiniLM   | UMAP (64)               | 0.648152 | 36.211846           | 64        | 0.010127             |
+| Baseline | TF-IDF (1000 dim)       | 0.584102 | 0.000000            | 1000      | 0.000584             |
+
+Ce qu'on observe ici c'est que l'UMAP à 64 dimensions est moins efficace qu'un
+simple PCA sur les mêmes dimensions.
+
+![images/20Newsgroup/barScore.png](images/20Newsgroup/barScore.png)
+
+mais sur un graphique l'utilité d'UMAP est directement visible :
+
+![images/20Newsgroup/Comparatifumap_visuel.png](images/20Newsgroup/Comparatifumap_visuel.png)
+
+UMAP est conçu pour préserver les voisinages locaux : il projette l'espace vectoriel de manière
+à regrouper les documents les plus similaires en clusters denses, au prix d'une déformation des
+distances globales et de la structure linéaire de l'espace.
+
+C'est précisément cette déformation qui pénalise les performances en classification. 
+Une régression logistique, dont le principe repose sur la séparation linéaire des classes,
+ne parvient plus à délimiter efficacement des clusters tordus dans un espace à 64 dimensions.
+
+En résumé, UMAP excelle pour la visualisation en 2D où la séparation visuelle des clusters 
+est l'objectif, mais utilisé comme étape de prétraitement pour un classifieur linéaire,
+il dégrade la structure nécessaire à la classification. Ses performances seraient
+potentiellement meilleures en combinaison avec un classifieur non-linéaire,
+comme un arbre de décision ou un réseau de neurones.
 
 ### Pourquoi ne pas tester BERT avec Matryoshka ?
 Sur le plan purement informatique, c'est tout à fait possible. En Python, 
@@ -472,16 +521,24 @@ généré ce vecteur.
 Cependant, sur le plan scientifique, tronquer un modèle BERT classique (comme MiniLM) 
 donnera de très mauvais résultats.
 
-#### Exemple de Bert classique avec Matrioshka :
+#### Exemple de Bert classique avec Matryoshka :
 
-ex
+classés selon le Score F1
 
-Pourquoi les scores ce sont effondrés avec BERT ?
+| Famille  | Méthode                 | Score F1 | Temps Réduction (s) | Dimension | Score F1 / Dimension |
+|----------|-------------------------|----------|---------------------|-----------|----------------------|
+| Arctic   | Pleine Dim (384 et 768) | 0.748704 | 0.000000            | 768       | 0.000975             |
+| MiniLM   | Pleine Dim (384 et 768) | 0.704850 | 0.000000            | 384       | 0.001836             |
+| Arctic   | Matryoshka (64)         | 0.637375 | 0.000000            | 64        | 0.009959             |
+| Baseline | TF-IDF (1000 dim)       | 0.584102 | 0.000000            | 1000      | 0.000584             |
+| MiniLM   | Matryoshka (64)         | 0.553343 | 0.000000            | 64        | 0.008646             |
+
+Pourquoi les scores se sont effondrés avec BERT ?
 Dans un BERT classique (MiniLM) : L'information sémantique est répartie de 
-manière égale sur l'ensemble des 384 dimensions. Si ont coupe les 320 dernières dimensions, 
-on supprimes aléatoirement des informations cruciales.
+manière égale sur l'ensemble des 384 dimensions. Si on coupe les 320 dernières dimensions, 
+on supprime aléatoirement des informations cruciales.
 
-Dans un modèle MRL (Granite, Nomic) : L'entraînement force le modèle à ranger 
+Dans un modèle MRL (Arctic) : L'entraînement force le modèle à ranger 
 l'information de la plus importante à la moins importante. 
 Les 64 premières dimensions agissent comme un "résumé exécutif" parfait de la phrase.
 
