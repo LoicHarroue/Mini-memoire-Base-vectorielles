@@ -1,4 +1,11 @@
-* a passer dans gdoc
+# Introduction
+
+Comment les résultats de BERT obtiennent de meilleurs résultats qu'un simple 
+algorithme "bag of words" comme TF-IDF, comment améliorer ces résultats en 
+suivant des techniques de réduction de dimensions et quels options pourraient 
+améliorer nos résultats par rapport à BERT.
+
+# Documentation
 ## TF-IDF
 
 TF-IDF (Term Frequency - Inverse Document Frequency) est un algorithme de traitement 
@@ -453,6 +460,31 @@ les relations de voisinage sont fiables.
 | Usage typique         | Réduction avant modèle     | Visualisation, clustering     |
 | Adapté aux embeddings | Partiellement              | Oui                           |
 
+
+# Demonstration
+
+
+### Pourquoi ne pas tester BERT avec Matryoshka ?
+Sur le plan purement informatique, c'est tout à fait possible. En Python, 
+tronquer un vecteur se fait avec un simple découpage [:, :64], peu importe le modèle qui a 
+généré ce vecteur.
+
+Cependant, sur le plan scientifique, tronquer un modèle BERT classique (comme MiniLM) 
+donnera de très mauvais résultats.
+
+#### Exemple de Bert classique avec Matrioshka :
+
+ex
+
+Pourquoi les scores ce sont effondrés avec BERT ?
+Dans un BERT classique (MiniLM) : L'information sémantique est répartie de 
+manière égale sur l'ensemble des 384 dimensions. Si ont coupe les 320 dernières dimensions, 
+on supprimes aléatoirement des informations cruciales.
+
+Dans un modèle MRL (Granite, Nomic) : L'entraînement force le modèle à ranger 
+l'information de la plus importante à la moins importante. 
+Les 64 premières dimensions agissent comme un "résumé exécutif" parfait de la phrase.
+
 ## Sources 
 Info générales :
 https://huggingface.co/spaces/hesamation/primer-llm-embedding?section=what_are_embeddings?
@@ -472,3 +504,6 @@ https://mlwiki.org/index.php/Curse_of_Dimensionality
 
 PCA :
 https://medium.com/@libertihub/principal-component-analysis-pca-an-intuitive-guide-for-everyone-5ea5431d7c17
+
+UMAP :
+https://arxiv.org/pdf/1802.03426
